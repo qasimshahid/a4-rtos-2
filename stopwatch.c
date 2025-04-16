@@ -1,86 +1,24 @@
-#include <stdio.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <float.h>
 #include <pthread.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <sys/time.h>
-#include <semaphore.h>
 #include <signal.h>
+#include <sched.h>
 #include "bbbio.h"
-
-#define START_STOP_BUTTON_PIN  67  // P9_12
-#define RESET_BUTTON_PIN       68  // P9_13
-#define RED_LED_PIN            44  // 
-#define GREEN_LED_PIN          26  // 
 
 // Thread priorities higher number = higher priority
 #define BUTTON_THREAD_PRIORITY     90  
 #define DISPLAY_THREAD_PRIORITY    80  
 #define TIMER_THREAD_PRIORITY      70  
 
-volatile float current_time = 0.0f;       
-volatile bool stopwatch_running = false;  
-volatile bool reset_requested = false; 
+int32_t START_STOP_BUTTON_PIN = -1;
+int32_t RESET_BUTTON_PIN = -1;
+int32_t RED_LED_PIN = -1;
+int32_t GREEN_LED_PIN = -1;
+
+float32_t current_time = 0.0f;       
+int32_t stopwatch_running = 0;  
+int32_t reset_requested = 0;
 
 pthread_mutex_t stopwatch_mutex;
-
-void *button_thread_func(void *arg);
-void *display_thread_func(void *arg);
-void *timer_thread_func(void *arg);
-void gpio_export(int pin);
-void gpio_set_direction(int pin, const char *direction);
-void gpio_set_value(int pin, int value);
-int gpio_get_value(int pin);
-void gpio_setup();
-void cleanup();
-
-int main() {
-    pthread_t button_thread, display_thread, timer_thread;
-    pthread_attr_t button_attr, display_attr, timer_attr;
-    struct sched_param button_param, display_param, timer_param;
-    
-    pthread_mutex_init(&stopwatch_mutex, NULL);
-
-    gpio_setup();
-    
-    set_gpio_on(RED_LED_PIN);
-    set_gpio_off(GREEN_LED_PIN);
-    
-    pthread_attr_init(&button_attr);
-    pthread_attr_setschedpolicy(&button_attr, SCHED_FIFO);
-    button_param.sched_priority = BUTTON_THREAD_PRIORITY;
-    pthread_attr_setschedparam(&button_attr, &button_param);
-    pthread_attr_setinheritsched(&button_attr, PTHREAD_EXPLICIT_SCHED);
-    
-    pthread_attr_init(&display_attr);
-    pthread_attr_setschedpolicy(&display_attr, SCHED_FIFO);
-    display_param.sched_priority = DISPLAY_THREAD_PRIORITY;
-    pthread_attr_setschedparam(&display_attr, &display_param);
-    pthread_attr_setinheritsched(&display_attr, PTHREAD_EXPLICIT_SCHED);
-    
-    pthread_attr_init(&timer_attr);
-    pthread_attr_setschedpolicy(&timer_attr, SCHED_FIFO);
-    timer_param.sched_priority = TIMER_THREAD_PRIORITY;
-    pthread_attr_setschedparam(&timer_attr, &timer_param);
-    pthread_attr_setinheritsched(&timer_attr, PTHREAD_EXPLICIT_SCHED);
-    
-    pthread_create(&button_thread, &button_attr, button_thread_func, NULL);
-    pthread_create(&display_thread, &display_attr, display_thread_func, NULL);
-    pthread_create(&timer_thread, &timer_attr, timer_thread_func, NULL);
-    
-
-    signal(SIGINT, (void (*)(int))cleanup);
-    
-    pthread_join(button_thread, NULL);
-    pthread_join(display_thread, NULL);
-    pthread_join(timer_thread, NULL);
-
-    cleanup();
-    
-    return 0;
-}
 
 /**
  * Button thread function
@@ -221,22 +159,27 @@ void *timer_thread_func(void *arg) {
 /**
  * Set up GPIO pins using the bbbio library
  */
-void gpio_setup() {
-    // Setup GPIO pins with appropriate directions
-    Buffer input_direction;
-    Buffer output_direction;
-    
-    // Copy GPIO direction strings to Buffer type
-    strncpy((char *)input_direction, GPIO_INPUT_MODE, FILE_PATH_LENGTH);
-    strncpy((char *)output_direction, GPIO_OUTPUT_MODE, FILE_PATH_LENGTH);
-    
-    // Setup buttons as inputs
-    setup_gpio_pin(START_STOP_BUTTON_PIN, input_direction);
-    setup_gpio_pin(RESET_BUTTON_PIN, input_direction);
-    
-    // Setup LEDs as outputs
-    setup_gpio_pin(RED_LED_PIN, output_direction);
-    setup_gpio_pin(GREEN_LED_PIN, output_direction);
+int32_t gpio_setup() {
+
+    // Initialize as 0 for unsuccessful until we make sure we setup our GPIO pins properly.
+    int32_t ret = 0;
+    if 
+    ( 
+        setup_gpio_pin(START_STOP_BUTTON_PIN, GPIO_INPUT_MODE) && 
+        setup_gpio_pin(RESET_BUTTON_PIN, GPIO_INPUT_MODE) && 
+        setup_gpio_pin(RED_LED_PIN, GPIO_OUTPUT_MODE) && 
+        setup_gpio_pin(GREEN_LED_PIN, GPIO_OUTPUT_MODE)
+    ) 
+    {
+        set_gpio_on(RED_LED_PIN);
+        set_gpio_off(GREEN_LED_PIN);
+        ret = 1;
+    }
+    else {
+        ret = 0;
+    }
+
+    return ret;
 }
 
 /**
@@ -270,4 +213,60 @@ void cleanup() {
     
     printf("\nStopwatch application terminated.\n");
     exit(0);
+}
+
+int main() {
+
+    // Set up threads with real-time priority using FIFO.
+    pthread_t button_thread, display_thread, timer_thread;
+    pthread_attr_t button_attr, display_attr, timer_attr;
+    struct sched_param button_param, display_param, timer_param;
+
+    pthread_attr_init(&button_attr);
+    pthread_attr_init(&display_attr);
+    pthread_attr_init(&timer_attr);
+
+    pthread_attr_setschedpolicy(&button_attr, SCHED_FIFO);
+    pthread_attr_setschedpolicy(&display_attr, SCHED_FIFO);
+    pthread_attr_setschedpolicy(&timer_attr, SCHED_FIFO);
+
+    button_param.sched_priority = BUTTON_THREAD_PRIORITY;
+    display_param.sched_priority = DISPLAY_THREAD_PRIORITY;
+    timer_param.sched_priority = TIMER_THREAD_PRIORITY;
+
+    pthread_attr_setschedparam(&button_attr, &button_param);
+    pthread_attr_setschedparam(&display_attr, &display_param);
+    pthread_attr_setschedparam(&timer_attr, &timer_param);
+
+    pthread_attr_setinheritsched(&button_attr, PTHREAD_EXPLICIT_SCHED);
+    pthread_attr_setinheritsched(&display_attr, PTHREAD_EXPLICIT_SCHED);
+    pthread_attr_setinheritsched(&timer_attr, PTHREAD_EXPLICIT_SCHED);
+    
+
+    // Initialize our mutexes and GPIOs before running our threads.
+    pthread_mutex_init(&stopwatch_mutex, NULL);
+    gpio_setup();
+    
+    pthread_create(&button_thread, &button_attr, button_thread_func, NULL);
+    pthread_create(&display_thread, &display_attr, display_thread_func, NULL);
+    pthread_create(&timer_thread, &timer_attr, timer_thread_func, NULL);
+
+    // Initialize our mutexes and GPIOs before running.
+    pthread_mutex_init(&stopwatch_mutex, NULL);
+
+    gpio_setup();
+    
+    set_gpio_on(RED_LED_PIN);
+    set_gpio_off(GREEN_LED_PIN);
+    
+
+    signal(SIGINT, (void (*)(int))cleanup);
+    
+    pthread_join(button_thread, NULL);
+    pthread_join(display_thread, NULL);
+    pthread_join(timer_thread, NULL);
+
+    cleanup();
+    
+    return 0;
 }
