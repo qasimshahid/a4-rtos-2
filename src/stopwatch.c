@@ -102,7 +102,7 @@ static void *display_thread_func(void) {
         unlockMutex();
 
         // Clear the current line
-        (void) printf("\r                                        \r");
+        (void) printf("\r                                                                 \r");
         
         if (is_running == 1) {
             // Display with 100ms resolution when running
@@ -150,7 +150,7 @@ static void *timer_thread_func(void) {
             reset_requested = 0;
         } 
         else if (stopwatch_running == 1) { // Update current time if stopwatch is running
-            if (current_time + elapsed_time <= (float) FLT_MAX) {
+            if (current_time + elapsed_time < (float) FLT_MAX) {
                 current_time += elapsed_time;
             }
             else {
