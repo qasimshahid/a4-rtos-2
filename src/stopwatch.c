@@ -50,11 +50,9 @@ static void *button_thread_func(void) {
     int32_t state = 0;
     
     while (1 == 1) {
-        // Read current button states
         start_stop_current = read_gpio_value(START_STOP_BUTTON_PIN);
         reset_current = read_gpio_value(RESET_BUTTON_PIN);
         
-        // Check for start/stop button press
         if ((int32_t) start_stop_current == 1 && (int32_t) start_stop_prev == 0) {
             lockMutex();
             // Toggle stopwatch state
@@ -62,7 +60,7 @@ static void *button_thread_func(void) {
             state = stopwatch_running;
             unlockMutex();
             
-            // Update LEDs based on state using bbbio functions
+            // Update LEDs based on state
             if (state == 1) {
                 set_gpio_off(RED_LED_PIN);
                 set_gpio_on(GREEN_LED_PIN);
@@ -98,7 +96,6 @@ static void *display_thread_func(void) {
     int32_t is_running = 0;
     
     while (1 == 1) {
-        // Get current state under mutex protection
         lockMutex();
         time_to_display = current_time;
         is_running = stopwatch_running;
@@ -107,7 +104,6 @@ static void *display_thread_func(void) {
         // Clear the current line
         (void) printf("\r                                        \r");
         
-        // Display with appropriate resolution based on state
         if (is_running == 1) {
             // Display with 100ms resolution when running
             (void) printf("Time: %.1f seconds", time_to_display);
@@ -148,10 +144,10 @@ static void *timer_thread_func(void) {
 
         lockMutex();
 
-        // Handle reset request if present
+        // Handle reset if requested
         if (reset_requested == 1) {
-            current_time = 0.0f;  // Reset the counter
-            reset_requested = 0;  // Clear the reset flag
+            current_time = 0.0f;
+            reset_requested = 0;
         } 
         else if (stopwatch_running == 1) { // Update current time if stopwatch is running
             if (current_time + elapsed_time <= (float) FLT_MAX) {
