@@ -19,6 +19,7 @@ This source was used to guide the definition of this header file. It provides in
 #include <stdint.h>
 #include <inttypes.h>
 #include <string.h>
+#include <float.h>
 
 /* --------------------------------------------- CONSTANTS ---------------------------------------------*/
 
