@@ -11,7 +11,7 @@
 #include "bbbio.h"
 
 #define START_STOP_BUTTON_PIN  67  // P9_12
-#define RESET_BUTTON_PIN       38  // P9_13
+#define RESET_BUTTON_PIN       68  // P9_13
 #define RED_LED_PIN            44  // 
 #define GREEN_LED_PIN          26  // 
 
